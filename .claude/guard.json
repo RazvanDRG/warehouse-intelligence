@@ -1,0 +1,5 @@
+{
+  "connect": "CONNECT.md",
+  "local_db_hosts": ["localhost", "127.0.0.1", "db"],
+  "verify_gate": true
+}
