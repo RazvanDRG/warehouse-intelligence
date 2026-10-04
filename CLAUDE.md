@@ -10,9 +10,10 @@ Critical (ask before every change): adapters/warehouse/action_client*.py, adapte
 Database files: **/alembic/**, **/db/**, **/models/**, **/projections/**
 Databases: local Postgres with pgvector and Redis in docker compose; no shared or production database reachable from here.
 Check command: python -m pytest -q && python tools/boundary_check.py
-Calls System 1 only from: adapters/warehouse/action_client*.py
+Calls System 1 only from: adapters/warehouse/action_client*.py, adapters/warehouse/simulator_client*.py
+The simulator client talks only to a local System 1 (localhost:8000), never the deployed one.
 Always ask before: changing agent prompts in core/agent/; any System 1 payload, status or API assumption not in docs/architecture.md section 4.
-Never: write to System 1 except through ActionClient with an idempotency key, by the service account; use real LLM quota in tests or CI; add paid services; guess System 1 fields.
+Never: write to System 1 except through ActionClient with an idempotency key, by the service account, or through the simulator client to a local System 1 (localhost:8000); write to the deployed System 1 from the simulator; use real LLM quota in tests or CI; add paid services; guess System 1 fields.
 
 ## Read on demand (grep headings, read the section you need)
 - `docs/architecture.md`: `grep -n "^#" docs/architecture.md` first, then one section. System 1 contract: section 4.
