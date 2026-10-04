@@ -15,7 +15,7 @@ Always ask before: changing agent prompts in core/agent/; any System 1 payload, 
 Never: write to System 1 except through ActionClient with an idempotency key, by the service account; use real LLM quota in tests or CI; add paid services; guess System 1 fields.
 
 ## Read on demand (grep headings, read the section you need)
-- `docs/architecture.md`: `grep -n "^## "` first, then one section. System 1 contract: section 4.
+- `docs/architecture.md`: `grep -n "^#" docs/architecture.md` first, then one section. System 1 contract: section 4.
 - `docs/plan.md`: only the current day, with `/day`.
 - `docs/progress.md`: last entry only.
 
