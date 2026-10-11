@@ -8,4 +8,4 @@ disable-model-invocation: true
 2. List the headings only: `grep -n "^#" docs/plan.md`. Find week "$0" and day "$1" there (the plan may say Week/Day or Săptămâna/Ziua), then read only the lines of that day's section.
 3. Read the last entry of `docs/progress.md` if it is not already in context.
 4. Reply in at most 6 lines: the task, its size (S, M, L), the workflow (/quick, /feature, /design, /fix, /db-change) and the user decisions it involves.
-5. Wait for "go" before changing anything.
+5. Ask with AskUserQuestion before changing anything: Go / Change the plan / Explain more.
