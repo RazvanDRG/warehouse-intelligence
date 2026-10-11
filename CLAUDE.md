@@ -5,7 +5,7 @@ Rules, guardrails and workflows come from claude-dev-kit. CONNECT.md links the k
 
 ## Kit rules (the guard reads these lines, so edits ask for approval)
 Project: Warehouse Intelligence: AI system that attaches to the Warehouse Operations Service (System 1). RAG, hybrid search, agents with human approval, evaluation, observability, security, MCP. Job-search portfolio for AI Engineer roles.
-Focus now: Week 1 of docs/plan.md (fix System 1 and start the repo). Update this line each week.
+Focus now: Week 1 Sat of docs/plan.md: repo skeleton (compose, /ops/live and /ops/ready, CI, core/ and adapters/warehouse/ layout). System 1 fixes are done.
 Critical (ask before every change): adapters/warehouse/action_client*.py, adapters/warehouse/events*.py, core/agent/, core/llm/gateway*.py, core/sql/, core/security/, approval*.py
 Database files: **/alembic/**, **/db/**, **/models/**, **/projections/**
 Databases: local Postgres with pgvector and Redis in docker compose; no shared or production database reachable from here.
