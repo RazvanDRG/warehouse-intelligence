@@ -78,8 +78,9 @@ def fields(path: Path):
 def path_globs(value: str):
     """'core/agent/, gateway.py and src/*.ts' -> ['core/agent/**', '**/gateway.py', 'src/*.ts']"""
     out = []
+    value = re.sub(r"\([^()]*\)", " ", value)  # notes in brackets never hide a path: 'a.py (local only)' -> 'a.py'
     for token in re.split(r"[,;]\s*|\s+and\s+", value):
-        t = token.strip().strip("`'\"").rstrip(". ")
+        t = re.sub(r"^[`'\"]+|[`'\".:,;]+$", "", (token.split() or [""])[0])  # first word: 'core/ for the agent' -> 'core/'
         if not re.fullmatch(r"[\w./*\\-]+", t or "-") or not ("/" in t or "*" in t or re.search(r"\.\w{1,6}$", t)):
             continue
         t = t.replace("\\", "/")
