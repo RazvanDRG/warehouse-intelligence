@@ -22,9 +22,15 @@ One entry per session, newest last. Written by `/handoff`.
   - Tests: 15 tests for ops endpoints, core-never-imports-adapters, Compose ports and localhost binding, URL encoding (tests/)
   - Config/CI: Compose stack on 127.0.0.1 with Prometheus and Grafana (infra/**), multi-stage non-root image (Dockerfile), CI with ruff, pytest, boundary check, docker build (.github/workflows/ci.yml), deps (pyproject.toml), decisions log (docs/decisions.md)
 - State: task/T-001-repo-skeleton, pushed, clean. Local virtual env in .venv; pip needed --use-feature=truststore once because of Avast HTTPS scanning. Docker Desktop was off, so the compose end-to-end check is not done.
-- Decisions taken by the user: D-001, D-002, D-003 (docs/decisions.md)
+- Decisions taken by the user (docs/decisions.md):
+  - D-001: /ops/ready checks Postgres and Redis
+  - D-002: Libraries listed in pyproject.toml
+  - D-003: CI uses actions/checkout@v5 and actions/setup-python@v6
+  - D-004: Compose ports bound to 127.0.0.1
+  - D-005: Database URL built from separate settings
+  - D-006: Remaining low review findings left for later
 - Open questions (candidate next tasks, from PR #1 LOW findings):
-  - Pin dependency versions (lock or constraints file) and image tags (pgvector:pg16, redis:7-alpine) to minor versions.
-  - /ops/ready is public and hits Postgres and Redis per call: short cache, rate limit or internal-only before deploy.
-  - Pass POSTGRES_USER and POSTGRES_DB to the api service explicitly instead of relying on code defaults ("wi").
+  - Unpinned versions: add a lock or constraints file and pin image tags (pgvector:pg16, redis:7-alpine) to minor versions.
+  - Public /ops/ready hits Postgres and Redis on every call: short cache, rate limit or internal-only before deploy.
+  - Default Postgres names: pass POSTGRES_USER and POSTGRES_DB to the api service instead of relying on code defaults ("wi").
 - Next step: start Docker Desktop, bring the stack up (README "Run locally") and check localhost:8001/ops/ready returns 200; then the user merges PR #1 and we run cleanup (.claude/current-task.json, switch to main).
