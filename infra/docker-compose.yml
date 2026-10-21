@@ -1,4 +1,5 @@
-# Local stack. Host ports avoid System 1 (Postgres 5432, API 8000) so both run side by side.
+# Local stack. Host ports avoid System 1 (Postgres 5432, API 8000) so both run side by side,
+# and bind to 127.0.0.1 so nothing is reachable from the network (Redis has no password).
 # Run from the repo root: docker compose --env-file .env -f infra/docker-compose.yml up -d
 name: warehouse-intelligence
 
@@ -8,10 +9,13 @@ services:
       context: ..
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://wi:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/wi
+      # Passed as parts, not a URL, so the password needs no URL encoding.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       REDIS_URL: redis://redis:6379/0
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,7 +29,7 @@ services:
       POSTGRES_DB: wi
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -37,7 +41,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -49,7 +53,7 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -58,7 +62,7 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - prometheus
 

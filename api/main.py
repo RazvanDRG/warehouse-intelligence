@@ -12,7 +12,7 @@ from core.health import postgres_check, redis_check
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Both clients connect lazily, so startup never fails because a dependency is down; /ops/ready reports it.
-    engine = create_async_engine(app.state.settings.database_url, pool_pre_ping=True)
+    engine = create_async_engine(app.state.settings.sqlalchemy_url(), pool_pre_ping=True)
     redis = Redis.from_url(app.state.settings.redis_url)
     app.state.readiness_checks = {"postgres": postgres_check(engine), "redis": redis_check(redis)}
     yield
