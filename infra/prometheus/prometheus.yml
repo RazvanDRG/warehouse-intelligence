@@ -1,0 +1,8 @@
+# Scrapes only itself for now; the API joins once GET /metrics exists (out of scope for T-001).
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
