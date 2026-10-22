@@ -34,3 +34,4 @@ One entry per session, newest last. Written by `/handoff`.
   - Public /ops/ready hits Postgres and Redis on every call: short cache, rate limit or internal-only before deploy.
   - Default Postgres names: pass POSTGRES_USER and POSTGRES_DB to the api service instead of relying on code defaults ("wi").
 - Next step: start Docker Desktop, bring the stack up (README "Run locally") and check localhost:8001/ops/ready returns 200; then the user merges PR #1 and we run cleanup (.claude/current-task.json, switch to main).
+- Plan: did Week 1 Sat (repo skeleton) and README v0; next Week 1 Sun (architecture sketch, week 2 plan)
