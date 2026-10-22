@@ -73,15 +73,46 @@ Every decision, with the alternative not chosen: `docs/decisions.md`.
 
 ## 📊 Architecture Overview
 
-```
-System 1 ──Kafka events──► Warehouse Intelligence ──► answers with citations, incidents, proposals
-   ▲                              │
-   └── REST, only after a human approves an action (one adapter file)
+```mermaid
+flowchart LR
+  subgraph S1["System 1: Warehouse Operations Service"]
+    DB1[("Postgres")]
+    OB["Outbox worker"]
+    API1["REST API"]
+  end
+  K[["Kafka (Aiven)<br/>stock reserved / released<br/>pick completed, order audit"]]
+  subgraph WI["Warehouse Intelligence"]
+    subgraph AD["adapters/warehouse/ (everything specific to System 1)"]
+      ES["EventSource<br/>(Kafka consumer)"]
+      SS["SchemaSource<br/>(schema snapshot)"]
+      AC["ActionClient<br/>(service account, idempotency key)"]
+    end
+    subgraph CORE["core/ (generic, no warehouse terms)"]
+      SR["Hybrid search"]
+      GW["LLM gateway"]
+      AG["Agent: proposes"]
+      OBS["Observability"]
+    end
+    OUT["Answers with citations,<br/>incidents, proposals"]
+    API["api/ (FastAPI routers)"]
+    PL["pipelines/ (background jobs)"]
+    PG[("Postgres + pgvector")]
+    R[("Redis: cache, rate limit, token budget")]
+  end
+  H(["Human approves"])
 
-Inside:  api/ (FastAPI routers) ─► core/ (generic: search, LLM gateway, agent, observability)
-                                   adapters/warehouse/ (everything specific to System 1)
-                                   pipelines/ (background jobs)
+  DB1 --> OB --> K -->|"1. events"| ES --> PL --> PG
+  DB1 -.->|"2. schema JSON, from CI"| SS --> PG
+  API --> SR --> PG
+  SR --> GW --> AG --> H -->|"3. approved action only"| AC --> API1
+  GW --- R
+  GW --> OUT
+  AG --> OUT
 ```
+
+Target design. Built so far: see Features > Built.
+
+System 1 stays the owner of its data. WI reads it through events, a schema snapshot and read endpoints, never its database. The only write path back is `ActionClient`, after a human approves. `core/` never imports `adapters/`.
 
 ---
 
