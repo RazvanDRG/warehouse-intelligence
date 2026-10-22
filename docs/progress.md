@@ -12,3 +12,25 @@ One entry per session, newest last. Written by `/handoff`.
   - Trace harness (W4) uses SQLAlchemy events on a test DB, as in architecture §6.
 - Open questions: W1 Fri read endpoint for unpublished outbox rows is a new System 1 API assumption (prepare with /system-change). How the W4 harness loads System 1's app without changing it.
 - Next step: Week 1 Mon in System 1 (E:\CV-uri\Proiecte CV\fastapi-auth-orders): outbox publish_event returns failure when Kafka is down, row not marked published; worker with FOR UPDATE SKIP LOCKED. Prepare it with /system-change, run /day first.
+
+## 2026-10-21 Kit 1.8.2, T-001 repo skeleton, draft PR #1
+- Done: kit skills start/day updated to 1.8.2 and pushed to main (fd848b0). T-001 built test first on task/T-001-repo-skeleton; review loop 2 evaluator PASS and risk PASS; CI green; draft PR https://github.com/RazvanDRG/warehouse-intelligence/pull/1 (not merged).
+- Changed:
+  - Backend: FastAPI app with public /ops/live and /ops/ready (Postgres and Redis checks, 2s timeout, no error text); database URL built from separate settings (api/main.py, api/routers/ops.py, core/health.py, core/config.py)
+  - Frontend: none
+  - Database: none; local pgvector Postgres as a Compose service only (infra/docker-compose.yml)
+  - Tests: 15 tests for ops endpoints, core-never-imports-adapters, Compose ports and localhost binding, URL encoding (tests/)
+  - Config/CI: Compose stack on 127.0.0.1 with Prometheus and Grafana (infra/**), multi-stage non-root image (Dockerfile), CI with ruff, pytest, boundary check, docker build (.github/workflows/ci.yml), deps (pyproject.toml), decisions log (docs/decisions.md)
+- State: task/T-001-repo-skeleton, pushed, clean. Local virtual env in .venv; pip needed --use-feature=truststore once because of Avast HTTPS scanning. Docker Desktop was off, so the compose end-to-end check is not done.
+- Decisions taken by the user (docs/decisions.md):
+  - D-001: /ops/ready checks Postgres and Redis
+  - D-002: Libraries listed in pyproject.toml
+  - D-003: CI uses actions/checkout@v5 and actions/setup-python@v6
+  - D-004: Compose ports bound to 127.0.0.1
+  - D-005: Database URL built from separate settings
+  - D-006: Remaining low review findings left for later
+- Open questions (candidate next tasks, from PR #1 LOW findings):
+  - Unpinned versions: add a lock or constraints file and pin image tags (pgvector:pg16, redis:7-alpine) to minor versions.
+  - Public /ops/ready hits Postgres and Redis on every call: short cache, rate limit or internal-only before deploy.
+  - Default Postgres names: pass POSTGRES_USER and POSTGRES_DB to the api service instead of relying on code defaults ("wi").
+- Next step: start Docker Desktop, bring the stack up (README "Run locally") and check localhost:8001/ops/ready returns 200; then the user merges PR #1 and we run cleanup (.claude/current-task.json, switch to main).
