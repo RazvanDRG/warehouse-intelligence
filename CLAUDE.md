@@ -19,6 +19,7 @@ Never: write to System 1 except through ActionClient with an idempotency key, by
 - `docs/architecture.md`: `grep -n "^#" docs/architecture.md` first, then one section. System 1 contract: section 4.
 - `docs/plan.md`: only the current day, with `/day`.
 - `docs/progress.md`: last entry only.
+- `docs/decisions.md`: decisions the user took (D-001...), grep the ID or topic first.
 
 ## Commands
 Fill in during week 1: run API, `make check` (then switch the Check command to it), `docker compose up -d`.
