@@ -35,3 +35,21 @@ One entry per session, newest last. Written by `/handoff`.
   - Default Postgres names: pass POSTGRES_USER and POSTGRES_DB to the api service instead of relying on code defaults ("wi").
 - Next step: start Docker Desktop, bring the stack up (README "Run locally") and check localhost:8001/ops/ready returns 200; then the user merges PR #1 and we run cleanup (.claude/current-task.json, switch to main).
 - Plan: did Week 1 Sat (repo skeleton) and README v0; next Week 1 Sun (architecture sketch, week 2 plan)
+
+## 2026-10-22 Kit 1.9.5, Week 1 Sun architecture diagram
+- Done: start/day skills updated to kit 1.9.5 (efbbfd4); plan position line added to the last note (bb2199f); merged branch task/T-001-repo-skeleton deleted on GitHub (already gone locally); README Architecture Overview replaced with a Mermaid diagram (db5db62). All pushed to main. Kit doctor 0 fail, 0 warn, 25 ok.
+- Changed:
+  - Backend: none
+  - Frontend: none
+  - Database: none
+  - Tests: none (15 pass, boundary check clean)
+  - Config/CI: /start and /day pick the next plan day from the Plan: line of the last note (.claude/skills/start/SKILL.md, .claude/skills/day/SKILL.md)
+  - Docs: README diagram of the target design: 3 channels with System 1, adapters and core, stores, human approval, outputs, labelled "Target design" (README.md); this note (docs/progress.md)
+- Plan: did Week 1 Sun (README v0 and architecture sketch; week 2 plan); next Week 2 Mon (Core structure and adapters/warehouse with the EventSource interface; aiokafka consumer)
+- State: main, clean except this note, in sync with origin.
+- Decisions taken by the user: none added to docs/decisions.md. docs/plan.md and docs/architecture.md stay generated copies; plan changes go into the Word original.
+- Open questions:
+  - Week 2 text (workflow per day, System 1 outbox read endpoint question, T-001 LOW findings on Sat) given to the user to paste into the Word plan; not pasted yet.
+  - Mermaid diagram rendering on GitHub not checked yet.
+- System 1 already has it: GET /integrations/events?published=false (outbox rows not yet published, paged). Nothing to build there.
+- Next step: Week 2 Mon with /day: EventSource Protocol in adapters/warehouse/ and the aiokafka consumer (task file, event envelope from architecture section 4).
