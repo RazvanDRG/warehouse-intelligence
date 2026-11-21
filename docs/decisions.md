@@ -49,3 +49,24 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: allowing git push, add or commit, alembic upgrade or CLAUDE.md edits - the kit rules require asking for them.
 - Affects: .claude/guard.json
 - Context: /kit-doctor --audit
+
+## 2026-11-21 D-008: aiokafka reads System 1 events
+- Decision: aiokafka is a runtime dependency in pyproject.toml, used only behind the EventSource in adapters/warehouse/.
+- Why: the plan names it; it is async like FastAPI and free.
+- Not chosen: confluent-kafka - sync C client, harder to install on Windows and in the slim image.
+- Affects: pyproject.toml, adapters/warehouse/
+- Context: T-002
+
+## 2026-11-21 D-009: EventSource and Event live in core/events.py
+- Decision: the generic Event type and EventSource Protocol sit in core/events.py; the Kafka implementation sits in adapters/warehouse/.
+- Why: architecture section 19, the core uses events without knowing they come from Kafka or System 1.
+- Not chosen: the interface inside adapters/warehouse/ - core would have to import the adapter.
+- Affects: core/events.py, adapters/warehouse/
+- Context: T-002
+
+## 2026-11-21 D-010: An unreadable message stops the consumer until dead-letter exists
+- Decision: a message with broken JSON or a missing envelope field raises an error and is not committed.
+- Why: nothing is lost silently; Week 2 Wed replaces this with the dead-letter table.
+- Not chosen: log and skip - the message would be marked done and lost.
+- Affects: adapters/warehouse/ consumer
+- Context: T-002
