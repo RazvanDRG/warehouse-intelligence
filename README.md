@@ -5,7 +5,7 @@ An AI layer that attaches to the Warehouse Operations Service (System 1) and mak
 The flow it is built for:
 System 1 events → Kafka → index and projections → question or incident → answer with citations or a proposed action → human approval
 
-**Status:** week 1 of 10. The repo skeleton is done: API with health checks, the local stack, tests and CI. The AI modules come next (see Future Improvements).
+**Status:** week 2 of 10. The repo skeleton is done (API with health checks, the local stack, tests and CI), and the Kafka event reader is built but not yet run against a live broker. The AI modules come next (see Future Improvements).
 
 ## 🌐 Live Demo
 
@@ -27,15 +27,16 @@ System 1 events → Kafka → index and projections → question or incident →
 
 **Backend**
 - Python 3.11, FastAPI, SQLAlchemy 2 (async) with asyncpg, Redis, pydantic-settings
+- aiokafka (Kafka consumer for System 1 events)
 - PostgreSQL 16 with pgvector (vector search inside Postgres)
 - Docker (multi-stage image, non-root user) and Docker Compose
-- Pytest (15 tests), Ruff (lint and format)
+- Pytest (44 tests), Ruff (lint and format)
 - GitHub Actions (CI)
 
 **Observability**
 - Prometheus and Grafana in the local stack
 
-**Planned:** Kafka consumer (aiokafka), LLM gateway, LangChain, hybrid search, MCP, PyTorch and Transformers for an embeddings model
+**Planned:** LLM gateway, LangChain, hybrid search, MCP, PyTorch and Transformers for an embeddings model
 
 ---
 
@@ -46,6 +47,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - `GET /ops/ready`: checks Postgres and Redis at the same time, with a timeout; 200 when both answer, 503 naming the one that is down, and no error text that could expose hosts or passwords
 - Local stack on 127.0.0.1 only, so nothing is reachable from the network
 - Database settings passed as separate parts, so any password works
+- Event reader: `EventSource` interface in `core/events.py`, with a Kafka implementation in `adapters/warehouse/`. It reads the 4 System 1 topics in its own consumer group (`KAFKA_GROUP_ID`, required, no default), checks every message against the event envelope (a time without a timezone counts as UTC), and marks a message done only after it has been handled. Connects to a local broker or to Aiven (SASL_SSL, settings from `KAFKA_*` environment variables)
 
 ### Planned modules
 - **A. Warehouse Map:** live digital twins of zones, racks and orders
@@ -152,8 +154,9 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 ## 🧪 Testing Strategy
 
-- 15 tests, run in CI on every push
+- 44 tests, run in CI on every push
 - The readiness checks are tested with faked dependencies: no real Postgres or Redis needed
+- The Kafka reader is tested with a fake consumer: valid and broken messages, commit only after the handler, no commit when the handler or parsing fails; no real Kafka needed
 - A test makes sure `core/` never imports `adapters/`
 - Tests read `docker-compose.yml` and check every port binds to 127.0.0.1 and avoids System 1's ports
 - The database URL is tested with passwords that contain `@`, `:` and `/`
@@ -175,6 +178,7 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 - `/ops/live` and `/ops/ready` are public, with no auth, like System 1's health ping
 - No database tables or migrations yet; `/metrics` is not built, so Prometheus scrapes only itself
 - Library versions and image tags are not pinned yet
+- The Kafka reader has not run against a live broker yet (planned with the week 2 integration test); events are read but not stored, and an unreadable message stops the reader until the dead-letter table exists
 
 ---
 

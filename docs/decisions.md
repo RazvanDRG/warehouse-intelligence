@@ -49,3 +49,38 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: allowing git push, add or commit, alembic upgrade or CLAUDE.md edits - the kit rules require asking for them.
 - Affects: .claude/guard.json
 - Context: /kit-doctor --audit
+
+## 2026-11-21 D-008: aiokafka reads System 1 events
+- Decision: aiokafka is a runtime dependency in pyproject.toml, used only behind the EventSource in adapters/warehouse/.
+- Why: the plan names it; it is async like FastAPI and free.
+- Not chosen: confluent-kafka - sync C client, harder to install on Windows and in the slim image.
+- Affects: pyproject.toml, adapters/warehouse/
+- Context: T-002
+
+## 2026-11-21 D-009: EventSource and Event live in core/events.py
+- Decision: the generic Event type and EventSource Protocol sit in core/events.py; the Kafka implementation sits in adapters/warehouse/.
+- Why: architecture section 19, the core uses events without knowing they come from Kafka or System 1.
+- Not chosen: the interface inside adapters/warehouse/ - core would have to import the adapter.
+- Affects: core/events.py, adapters/warehouse/
+- Context: T-002
+
+## 2026-11-21 D-010: An unreadable message stops the consumer until dead-letter exists
+- Decision: a message with broken JSON or a missing envelope field raises an error and is not committed.
+- Why: nothing is lost silently; Week 2 Wed replaces this with the dead-letter table.
+- Not chosen: log and skip - the message would be marked done and lost.
+- Affects: adapters/warehouse/ consumer
+- Context: T-002
+
+## 2026-11-21 D-011: Kafka login defaults to SASL PLAIN, like System 1
+- Decision: KAFKA_SASL_MECHANISM defaults to PLAIN, the mechanism System 1's producer uses on the same Aiven cluster (Backend/app/services/kafka_producer.py).
+- Why: one Aiven setup for both systems; the password is still sent inside TLS (SASL_SSL).
+- Not chosen: SCRAM-SHA-256 as default - would need SCRAM enabled for the WI principal; still selectable through the variable.
+- Affects: adapters/warehouse/kafka_config.py
+- Context: T-002
+
+## 2026-11-21 D-012: KAFKA_GROUP_ID is required, with no default
+- Decision: the consumer refuses to start without KAFKA_GROUP_ID; every deployment and local run sets its own group.
+- Why: a shared default lets a local run on Aiven take messages from the deployed reader (T-002 risk review).
+- Not chosen: a default such as warehouse-intelligence - easy to reuse by accident.
+- Affects: adapters/warehouse/kafka_config.py, .env.example
+- Context: T-002 review loop 1
