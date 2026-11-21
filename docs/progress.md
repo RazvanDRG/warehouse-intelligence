@@ -53,3 +53,22 @@ One entry per session, newest last. Written by `/handoff`.
   - Mermaid diagram rendering on GitHub not checked yet.
 - System 1 already has it: GET /integrations/events?published=false (outbox rows not yet published, paged). Nothing to build there.
 - Next step: Week 2 Mon with /day: EventSource Protocol in adapters/warehouse/ and the aiokafka consumer (task file, event envelope from architecture section 4).
+
+## 2026-11-21 Kit 2.0 project settings and guard tuning
+- Done: kit doctor 0 fail, 0 warn, 26 ok; 90-day guard audit (243 asks, 24 blocks); read-only commands allowed; kit 2.0 settings added; checks switched to the .venv Python. Pushed to main as 8c84508 and 5eee174, on top of 022ddde (LICENSE, MIT, added on GitHub).
+- Changed:
+  - Backend: none
+  - Frontend: none
+  - Database: none
+  - Tests: none (15 pass with the .venv Python, boundary check clean)
+  - Config/CI: git diff / rev-parse / branch --show-current, gh run view / list and pytest (plain or .venv Python) run without a guard prompt (.claude/guard.json); project model set to opus (.claude/settings.json); Kit rules gain "Merge: squash" and the Check command uses .venv/Scripts/python.exe (CLAUDE.md)
+  - Docs: D-007 (docs/decisions.md); this note (docs/progress.md)
+- Plan: no plan day worked this session; next Week 2 Mon (Core structure and adapters/warehouse with the EventSource interface; aiokafka consumer)
+- State: main, clean except this note, in sync with origin.
+- Decisions taken by the user: D-007 Read-only commands skip the guard prompt.
+- Open questions:
+  - Week 2 text for the Word plan still not pasted.
+  - Mermaid diagram rendering on GitHub not checked yet.
+  - Guard blocks marked "reads a secret file" include a plain `cd ~/.claude/dev-kit; ls`; the audit log shows only the start of the others, so false alarms are unclear.
+  - Plain `python` lacks sqlalchemy and redis; always use the .venv Python.
+- Next step: Week 2 Mon with /day: EventSource Protocol in adapters/warehouse/ and the aiokafka consumer (task file, event envelope from docs/architecture.md section 4).
