@@ -72,3 +72,21 @@ One entry per session, newest last. Written by `/handoff`.
   - Guard blocks marked "reads a secret file" include a plain `cd ~/.claude/dev-kit; ls`; the audit log shows only the start of the others, so false alarms are unclear.
   - Plain `python` lacks sqlalchemy and redis; always use the .venv Python.
 - Next step: Week 2 Mon with /day: EventSource Protocol in adapters/warehouse/ and the aiokafka consumer (task file, event envelope from docs/architecture.md section 4).
+
+## 2026-11-21 T-002 EventSource and Kafka consumer
+- Done: T-002 built test first, review PASS in loop 1 and loop 2 (evaluator and risk), merged as PR #2 (4cf5efa, a merge commit, not squash); branch deleted here and on GitHub.
+- Changed:
+  - Backend: generic Event and EventSource interface (core/events.py); System 1 envelope parsing, times without a timezone read as UTC (adapters/warehouse/events.py); KAFKA_* settings with required group id, manual commit, 4 topics, SASL_SSL with CA file, PLAIN like System 1 (adapters/warehouse/kafka_config.py); reader that commits only after the handler (adapters/warehouse/kafka_source.py)
+  - Frontend: none
+  - Database: none
+  - Tests: 29 Kafka tests with a fake consumer, KAFKA_* variables cleared first; 44 in total (tests/test_events.py)
+  - Config/CI: aiokafka dependency (pyproject.toml); KAFKA_* names (.env.example); CI green on PR #2
+  - Docs: README status, stack, features, design decisions, testing, limits; D-008 to D-012; T-002 task file with follow-ups, status done
+- Plan: did Week 2 Mon (Core structure and adapters/warehouse with the EventSource interface; aiokafka consumer); next Week 2 Tue (processed_events table on event_id; duplicates are ignored; tests)
+- State: main, in sync with origin except this note and the README and task file edits.
+- Decisions taken by the user: D-008 aiokafka; D-009 EventSource in core/events.py; D-010 unreadable message stops the consumer; D-011 SASL PLAIN like System 1; D-012 KAFKA_GROUP_ID required.
+- Open questions:
+  - PR #2 used a merge commit, not squash as CLAUDE.md says; consider allowing only squash in the GitHub repo settings.
+  - Guard blocked a Grep with a `!**/tests/**` glob as a secret file (false alarm).
+  - Week 2 text for the Word plan and Mermaid rendering on GitHub still open from the last note.
+- Next step: Week 2 Tue with /day then /db-change: processed_events table keyed on event_id, duplicate check before any handler writes (T-002 Follow-ups in docs/tasks/T-002.md).

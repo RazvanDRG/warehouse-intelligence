@@ -67,6 +67,9 @@ System 1 events → Kafka → index and projections → question or incident →
 - Every local port binds to 127.0.0.1: Redis has no password, so nothing should be reachable from the network (D-004)
 - The database URL is built from separate settings, so a password with `@` or `:` cannot break it (D-005)
 - `core/` never imports `adapters/`: the AI parts stay generic, everything specific to System 1 lives in one place
+- The core reads events through a generic `EventSource`; Kafka lives only in the adapter (D-009)
+- A Kafka message is marked done only after it has been handled, and an unreadable one stops the reader until the dead-letter table exists, so nothing is lost silently (D-010)
+- Every deployment and local run sets its own `KAFKA_GROUP_ID`, so a local run never takes messages from the deployed reader (D-012)
 - System 1 is touched only through read channels (Kafka events, the schema, read endpoints) and one controlled write channel, used by the agent only after a human approves
 
 Every decision, with the alternative not chosen: `docs/decisions.md`.
