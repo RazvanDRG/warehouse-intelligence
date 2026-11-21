@@ -9,7 +9,7 @@ Focus now: Week 1 Sat of docs/plan.md: repo skeleton (compose, /ops/live and /op
 Critical (ask before every change): adapters/warehouse/action_client*.py, adapters/warehouse/events*.py, core/agent/, core/llm/gateway*.py, core/sql/, core/security/, approval*.py
 Database files: **/alembic/**, **/db/**, **/models/**, **/projections/**
 Databases: local Postgres with pgvector and Redis in docker compose; no shared or production database reachable from here.
-Check command: python -m pytest -q && python tools/boundary_check.py
+Check command: .venv/Scripts/python.exe -m pytest -q && .venv/Scripts/python.exe tools/boundary_check.py
 Merge: squash
 Calls System 1 only from: adapters/warehouse/action_client*.py, adapters/warehouse/simulator_client*.py
 The simulator client talks only to a local System 1 (localhost:8000), never the deployed one.

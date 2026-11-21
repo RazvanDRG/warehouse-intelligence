@@ -5,6 +5,7 @@
   "allow_commands": [
     "^git (diff|rev-parse|branch --show-current)\\b",
     "^gh run (view|list)\\b",
-    "^python -m pytest\\b"
+    "^python -m pytest\\b",
+    "^\\.venv[\\\\/]Scripts[\\\\/]python(\\.exe)? -m pytest\\b"
   ]
 }
