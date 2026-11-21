@@ -20,7 +20,8 @@ class KafkaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="KAFKA_", env_file=".env", extra="ignore")
 
     bootstrap_servers: str = "localhost:9092"
-    group_id: str = "warehouse-intelligence"
+    # No default: a local run sharing the deployed reader's group would take its messages.
+    group_id: str = ""
     topics: list[str] = Field(default_factory=lambda: list(WAREHOUSE_TOPICS))
     # A new consumer group starts from the oldest kept message, so nothing published before it is missed.
     auto_offset_reset: Literal["earliest", "latest"] = "earliest"
@@ -35,6 +36,8 @@ class KafkaSettings(BaseSettings):
 
     def consumer_kwargs(self, ssl_context_factory: Callable[[str], Any] = default_ssl_context) -> dict[str, Any]:
         """Keyword arguments for AIOKafkaConsumer. Offsets are committed by hand, never automatically."""
+        if not self.group_id.strip():
+            raise ValueError("KAFKA_GROUP_ID is required: give every deployment and every local run its own group")
         kwargs: dict[str, Any] = {
             "bootstrap_servers": self.bootstrap_servers,
             "group_id": self.group_id,

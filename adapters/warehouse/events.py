@@ -1,11 +1,11 @@
 """System 1 event envelope (docs/architecture.md section 4) and its mapping to the core Event."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, StrictInt, ValidationError
+from pydantic import BaseModel, ConfigDict, StrictInt, ValidationError, field_validator
 
 from core.events import Event
 
@@ -26,6 +26,12 @@ class WarehouseEnvelope(BaseModel):
     # Required key; null is accepted because section 4 does not say it is always set.
     request_id: str | None
     payload: dict[str, Any]
+
+    @field_validator("occurred_at")
+    @classmethod
+    def assume_utc(cls, value: datetime) -> datetime:
+        # System 1 sets occurred_at with datetime.utcnow; a time without a zone is UTC.
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
 
 def parse_message(value: bytes) -> Event:

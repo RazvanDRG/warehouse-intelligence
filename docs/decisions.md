@@ -77,3 +77,10 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: SCRAM-SHA-256 as default - would need SCRAM enabled for the WI principal; still selectable through the variable.
 - Affects: adapters/warehouse/kafka_config.py
 - Context: T-002
+
+## 2026-11-21 D-012: KAFKA_GROUP_ID is required, with no default
+- Decision: the consumer refuses to start without KAFKA_GROUP_ID; every deployment and local run sets its own group.
+- Why: a shared default lets a local run on Aiven take messages from the deployed reader (T-002 risk review).
+- Not chosen: a default such as warehouse-intelligence - easy to reuse by accident.
+- Affects: adapters/warehouse/kafka_config.py, .env.example
+- Context: T-002 review loop 1

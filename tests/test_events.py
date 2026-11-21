@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -65,8 +66,16 @@ class FakeConsumer:
             yield message
 
 
+@pytest.fixture(autouse=True)
+def no_kafka_env(monkeypatch):
+    # A developer's terminal may hold real KAFKA_* variables; none of them may reach a test.
+    for name in [n for n in os.environ if n.upper().startswith("KAFKA_")]:
+        monkeypatch.delenv(name)
+
+
 def kafka_settings(**values) -> KafkaSettings:
     # _env_file=None keeps a developer's real .env out of the test.
+    values.setdefault("group_id", "wi-test")
     return KafkaSettings(_env_file=None, **values)
 
 
@@ -109,6 +118,18 @@ def test_parse_missing_field(field):
 def test_parse_broken_json():
     with pytest.raises(EnvelopeError, match="JSON"):
         parse_message(b'{"event_id": ')
+
+
+def test_parse_time_without_zone_is_utc():
+    # System 1 sets occurred_at with datetime.utcnow, so a time without a zone means UTC.
+    event = parse_message(encode(envelope(occurred_at="2026-11-21T10:15:00")))
+    assert event.occurred_at == datetime(2026, 11, 21, 10, 15, tzinfo=UTC)
+
+
+def test_parse_keeps_an_explicit_zone():
+    event = parse_message(encode(envelope(occurred_at="2026-11-21T12:15:00+02:00")))
+    assert event.occurred_at == datetime(2026, 11, 21, 10, 15, tzinfo=UTC)
+    assert event.occurred_at.utcoffset().total_seconds() == 7200
 
 
 def test_parse_rejects_non_uuid_event_id():
@@ -174,7 +195,7 @@ def test_consumer_config_sasl_ssl():
     kwargs = settings.consumer_kwargs(ssl_context_factory=lambda cafile: f"context for {cafile}")
     assert kwargs == {
         "bootstrap_servers": "kafka-test.example.com:12345",
-        "group_id": "warehouse-intelligence",
+        "group_id": "wi-test",
         "enable_auto_commit": False,
         "auto_offset_reset": "earliest",
         "security_protocol": "SASL_SSL",
@@ -190,11 +211,26 @@ def test_consumer_config_plaintext():
     kwargs = kafka_settings().consumer_kwargs()
     assert kwargs == {
         "bootstrap_servers": "localhost:9092",
-        "group_id": "warehouse-intelligence",
+        "group_id": "wi-test",
         "enable_auto_commit": False,
         "auto_offset_reset": "earliest",
         "security_protocol": "PLAINTEXT",
     }
+
+
+@pytest.mark.parametrize("group_id", ["", "   "])
+def test_group_id_is_required(group_id):
+    with pytest.raises(ValueError, match="KAFKA_GROUP_ID is required"):
+        kafka_settings(group_id=group_id).consumer_kwargs()
+
+
+def test_group_id_has_no_default():
+    assert KafkaSettings(_env_file=None).group_id == ""
+
+
+def test_group_id_read_from_environment(monkeypatch):
+    monkeypatch.setenv("KAFKA_GROUP_ID", "wi-env-test")
+    assert KafkaSettings(_env_file=None).consumer_kwargs()["group_id"] == "wi-env-test"
 
 
 @pytest.mark.parametrize("missing", ["sasl_username", "sasl_password", "ssl_cafile"])
@@ -238,7 +274,10 @@ def test_env_example_lists_kafka_names():
         "KAFKA_SASL_PASSWORD",
         "KAFKA_SSL_CAFILE",
     }
+    required = {"KAFKA_GROUP_ID"}
     for name in names:
         entry = [line for line in lines if line.lstrip("# ").startswith(name + "=")]
-        assert entry, f"{name} missing from .env.example"
+        assert len(entry) == 1, f"{name} must appear once in .env.example"
         assert entry[0].split("=", 1)[1].strip() == "", f"{name} has a value in .env.example"
+        # Required names are active lines; optional ones are commented out.
+        assert entry[0].startswith("#") != (name in required), f"{name} is commented the wrong way"

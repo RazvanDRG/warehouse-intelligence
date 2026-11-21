@@ -30,7 +30,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - aiokafka (Kafka consumer for System 1 events)
 - PostgreSQL 16 with pgvector (vector search inside Postgres)
 - Docker (multi-stage image, non-root user) and Docker Compose
-- Pytest (38 tests), Ruff (lint and format)
+- Pytest (44 tests), Ruff (lint and format)
 - GitHub Actions (CI)
 
 **Observability**
@@ -47,7 +47,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - `GET /ops/ready`: checks Postgres and Redis at the same time, with a timeout; 200 when both answer, 503 naming the one that is down, and no error text that could expose hosts or passwords
 - Local stack on 127.0.0.1 only, so nothing is reachable from the network
 - Database settings passed as separate parts, so any password works
-- Event reader: `EventSource` interface in `core/events.py`, with a Kafka implementation in `adapters/warehouse/`. It reads the 4 System 1 topics in its own consumer group, checks every message against the event envelope, and marks a message done only after it has been handled. Connects to a local broker or to Aiven (SASL_SSL, settings from `KAFKA_*` environment variables)
+- Event reader: `EventSource` interface in `core/events.py`, with a Kafka implementation in `adapters/warehouse/`. It reads the 4 System 1 topics in its own consumer group (`KAFKA_GROUP_ID`, required, no default), checks every message against the event envelope (a time without a timezone counts as UTC), and marks a message done only after it has been handled. Connects to a local broker or to Aiven (SASL_SSL, settings from `KAFKA_*` environment variables)
 
 ### Planned modules
 - **A. Warehouse Map:** live digital twins of zones, racks and orders
@@ -154,7 +154,7 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 ## 🧪 Testing Strategy
 
-- 38 tests, run in CI on every push
+- 44 tests, run in CI on every push
 - The readiness checks are tested with faked dependencies: no real Postgres or Redis needed
 - The Kafka reader is tested with a fake consumer: valid and broken messages, commit only after the handler, no commit when the handler or parsing fails; no real Kafka needed
 - A test makes sure `core/` never imports `adapters/`
