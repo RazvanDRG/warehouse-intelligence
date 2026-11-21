@@ -1,5 +1,10 @@
 {
   "connect": "CONNECT.md",
   "local_db_hosts": ["localhost", "127.0.0.1", "db"],
-  "verify_gate": true
+  "verify_gate": true,
+  "allow_commands": [
+    "^git (diff|rev-parse|branch --show-current)\\b",
+    "^gh run (view|list)\\b",
+    "^python -m pytest\\b"
+  ]
 }

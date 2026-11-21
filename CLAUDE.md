@@ -10,6 +10,7 @@ Critical (ask before every change): adapters/warehouse/action_client*.py, adapte
 Database files: **/alembic/**, **/db/**, **/models/**, **/projections/**
 Databases: local Postgres with pgvector and Redis in docker compose; no shared or production database reachable from here.
 Check command: python -m pytest -q && python tools/boundary_check.py
+Merge: squash
 Calls System 1 only from: adapters/warehouse/action_client*.py, adapters/warehouse/simulator_client*.py
 The simulator client talks only to a local System 1 (localhost:8000), never the deployed one.
 Always ask before: changing agent prompts in core/agent/; any System 1 payload, status or API assumption not in docs/architecture.md section 4.

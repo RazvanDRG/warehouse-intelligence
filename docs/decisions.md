@@ -42,3 +42,10 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: fix them in T-001 - grows the task past its contract.
 - Affects: PR #1 description, docs/progress.md open questions
 - Context: T-001
+
+## 2026-11-21 D-007: Read-only commands skip the guard prompt
+- Decision: .claude/guard.json allow_commands lets git diff / rev-parse / branch --show-current, gh run view / list and python -m pytest run without asking.
+- Why: the 90-day guard audit showed these asks repeat and never change code, data or GitHub.
+- Not chosen: allowing git push, add or commit, alembic upgrade or CLAUDE.md edits - the kit rules require asking for them.
+- Affects: .claude/guard.json
+- Context: /kit-doctor --audit
