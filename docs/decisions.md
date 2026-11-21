@@ -70,3 +70,10 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: log and skip - the message would be marked done and lost.
 - Affects: adapters/warehouse/ consumer
 - Context: T-002
+
+## 2026-11-21 D-011: Kafka login defaults to SASL PLAIN, like System 1
+- Decision: KAFKA_SASL_MECHANISM defaults to PLAIN, the mechanism System 1's producer uses on the same Aiven cluster (Backend/app/services/kafka_producer.py).
+- Why: one Aiven setup for both systems; the password is still sent inside TLS (SASL_SSL).
+- Not chosen: SCRAM-SHA-256 as default - would need SCRAM enabled for the WI principal; still selectable through the variable.
+- Affects: adapters/warehouse/kafka_config.py
+- Context: T-002
