@@ -87,10 +87,13 @@ def test_kafka_source_is_an_event_source():
     assert isinstance(KafkaEventSource(FakeConsumer([])), EventSource)
 
 
-def test_core_events_has_no_warehouse_terms():
-    text = (ROOT / "core" / "events.py").read_text(encoding="utf-8").lower()
-    for term in ("kafka", "order", "wms", "stock", "warehouse"):
-        assert term not in text, f"core/events.py mentions {term!r}"
+def test_core_has_no_warehouse_terms():
+    files = sorted((ROOT / "core").rglob("*.py"))
+    assert ROOT / "core" / "idempotency.py" in files
+    for path in files:
+        text = path.read_text(encoding="utf-8").lower()
+        for term in ("kafka", "order", "wms", "stock", "warehouse"):
+            assert term not in text, f"{path.relative_to(ROOT)} mentions {term!r}"
 
 
 # AC-2: envelope parsing

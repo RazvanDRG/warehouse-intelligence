@@ -3,7 +3,7 @@
 import asyncio
 
 from alembic import command
-from sqlalchemy import inspect
+from sqlalchemy import BigInteger, Integer, Text, inspect
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.dbsupport import alembic_config, database_url_or_skip
@@ -40,6 +40,10 @@ def test_upgrade_downgrade_upgrade():
     columns = asyncio.run(table_columns(url))
     assert list(columns) == ["event_id", "topic", "partition", "offset", "processed_at"]
     assert [name for name, c in columns.items() if c["primary_key"]] == ["event_id"]
+    assert isinstance(columns["event_id"]["type"], Text)
+    assert isinstance(columns["topic"]["type"], Text)
+    assert isinstance(columns["partition"]["type"], Integer)
+    assert isinstance(columns["offset"]["type"], BigInteger)
     assert all(not c["nullable"] for c in columns.values())
     assert columns["processed_at"]["default"] is not None
     assert columns["processed_at"]["type"].timezone is True
