@@ -89,7 +89,7 @@ One entry per session, newest last. Written by `/handoff`.
   - PR #2 used a merge commit, not squash as CLAUDE.md says; consider allowing only squash in the GitHub repo settings.
   - Guard blocked a Grep with a `!**/tests/**` glob as a secret file (false alarm).
   - Week 2 text for the Word plan and Mermaid rendering on GitHub still open from the last note.
-- Next step: Week 2 Tue with /day then /db-change: processed_events table keyed on event_id, duplicate check before any handler writes (T-002 Follow-ups in docs/tasks/T-002.md).
+- Next step: Week 2 Tue with /day then /db-change: processed_events table keyed on event_id, duplicate check before any handler writes (T-002 Follow-ups in docs/tasks/T-002-d1.w2.md).
 
 ## 2026-11-22 T-003 processed_events duplicate check
 - Done: T-003 built test first through /db-change, review PASS in loop 2 (evaluator and risk), CI green with 63 passed and no skips (AC-9), squash-merged as PR #3 (236caea); branch deleted here and on GitHub, current-task.json removed.
@@ -106,6 +106,6 @@ One entry per session, newest last. Written by `/handoff`.
 - Open questions:
   - Guard blocks commands whose text names the env files (PR body, this note) and a booleans-only settings check (false alarms); write "env example file" or "local env file" instead.
   - docs/architecture.md lists processed_events as event_id, topic, processed_at; partition and offset were added: run /docs-check.
-  - T-003 follow-ups (handler must not commit its connection, debug log on skip, downgrade loses history, alembic guard for Supabase, pruning) in docs/tasks/T-003.md.
+  - T-003 follow-ups (handler must not commit its connection, debug log on skip, downgrade loses history, alembic guard for Supabase, pruning) in docs/tasks/T-003-d2.w2.md.
   - Still open: allow only squash merges in GitHub settings; Week 2 text for the Word plan; Mermaid rendering.
-- Next step: Week 2 Wed with /day then /task and /db-change: dead-letter table; a tombstone (no value) caught as EnvelopeError and sent there (T-002 follow-up in docs/tasks/T-002.md); files adapters/warehouse/kafka_source.py, adapters/warehouse/events.py (critical), core/db/tables.py, alembic/versions/.
+- Next step: Week 2 Wed with /day then /task and /db-change: dead-letter table; a tombstone (no value) caught as EnvelopeError and sent there (T-002 follow-up in docs/tasks/T-002-d1.w2.md); files adapters/warehouse/kafka_source.py, adapters/warehouse/events.py (critical), core/db/tables.py, alembic/versions/.
