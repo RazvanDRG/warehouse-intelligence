@@ -90,3 +90,22 @@ One entry per session, newest last. Written by `/handoff`.
   - Guard blocked a Grep with a `!**/tests/**` glob as a secret file (false alarm).
   - Week 2 text for the Word plan and Mermaid rendering on GitHub still open from the last note.
 - Next step: Week 2 Tue with /day then /db-change: processed_events table keyed on event_id, duplicate check before any handler writes (T-002 Follow-ups in docs/tasks/T-002.md).
+
+## 2026-11-22 T-003 processed_events duplicate check
+- Done: T-003 built test first through /db-change, review PASS in loop 2 (evaluator and risk), CI green with 63 passed and no skips (AC-9), squash-merged as PR #3 (236caea); branch deleted here and on GitHub, current-task.json removed.
+- Changed:
+  - Backend: events carry their Kafka position; a generic wrapper records each event_id and runs the handler in one transaction, skipping repeats, so the offset is committed only after that transaction (core/events.py, core/idempotency.py, adapters/warehouse/kafka_source.py)
+  - Frontend: none
+  - Database: new table processed_events (event_id text primary key, topic, partition, offset, processed_at default now()), first Alembic migration; applied only on local wi_test by the tests, wi untouched (alembic/versions/0001_processed_events.py, core/db/tables.py, alembic.ini, alembic/env.py)
+  - Tests: migration up/down/up with column types, first delivery, duplicate skipped, failure rolls back both, replay through a new group, commit order, local *_test guard, all of core/ free of warehouse words; 63 in total (tests/test_migrations.py, tests/test_idempotency.py, tests/test_events.py, tests/dbsupport.py)
+  - Config/CI: alembic dependency and ruff isort setting (pyproject.toml); throwaway pgvector Postgres service and TEST_DATABASE_URL for pytest (.github/workflows/ci.yml); TEST_DATABASE_URL name (env example file)
+  - Docs: README key capabilities, stack, features, "Replays are safe", design decisions, running locally, CI, testing, limits; D-013 to D-017; T-003 task file with follow-ups, status done
+- Plan: did Week 2 Tue (processed_events table on event_id; duplicates are ignored; tests); next Week 2 Wed (Dead-letter: invalid message, broken payload, limited retry)
+- State: main, in sync with origin after this note. Local Postgres container running with wi_test.
+- Decisions taken by the user: D-013 Alembic; D-014 Event carries an optional typed position; D-015 duplicate check as a wrapper; D-016 TEST_DATABASE_URL, skipped locally when unset; D-017 CI Postgres service.
+- Open questions:
+  - Guard blocks commands whose text names the env files (PR body, this note) and a booleans-only settings check (false alarms); write "env example file" or "local env file" instead.
+  - docs/architecture.md lists processed_events as event_id, topic, processed_at; partition and offset were added: run /docs-check.
+  - T-003 follow-ups (handler must not commit its connection, debug log on skip, downgrade loses history, alembic guard for Supabase, pruning) in docs/tasks/T-003.md.
+  - Still open: allow only squash merges in GitHub settings; Week 2 text for the Word plan; Mermaid rendering.
+- Next step: Week 2 Wed with /day then /task and /db-change: dead-letter table; a tombstone (no value) caught as EnvelopeError and sent there (T-002 follow-up in docs/tasks/T-002.md); files adapters/warehouse/kafka_source.py, adapters/warehouse/events.py (critical), core/db/tables.py, alembic/versions/.

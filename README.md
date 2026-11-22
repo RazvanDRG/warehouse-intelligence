@@ -18,7 +18,8 @@ System 1 events → Kafka → index and projections → question or incident →
 - Liveness and readiness endpoints: the API reports whether Postgres and Redis answer, within a timeout
 - The whole local stack starts with one command: API, Postgres with pgvector, Redis, Prometheus, Grafana
 - Runs side by side with System 1 on the same machine (different ports)
-- Every push is checked by CI: lint, format, tests, the one-door boundary check and a Docker build
+- Reads System 1's Kafka events and handles each one only once, even when Kafka delivers it again or a new consumer group replays everything
+- Every push is checked by CI: lint, format, tests (database tests on a real Postgres), the one-door boundary check and a Docker build
 - One door to System 1: only one adapter file may call it, checked in CI
 
 ---
