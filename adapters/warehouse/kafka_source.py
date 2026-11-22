@@ -1,12 +1,13 @@
 """EventSource backed by an aiokafka consumer: one message at a time, offset committed after the handler."""
 
+from dataclasses import replace
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer, TopicPartition
 
 from adapters.warehouse.events import EnvelopeError, parse_message
 from adapters.warehouse.kafka_config import KafkaSettings
-from core.events import EventHandler
+from core.events import EventHandler, Position
 
 
 class KafkaEventSource:
@@ -30,6 +31,7 @@ class KafkaEventSource:
                     raise EnvelopeError(
                         f"{message.topic} partition {message.partition} offset {message.offset}: {exc}"
                     ) from None
+                event = replace(event, position=Position(message.topic, message.partition, message.offset))
                 await handler(event)
                 # Kafka stores the next offset to read, so a restart resumes after this message.
                 await self._consumer.commit({TopicPartition(message.topic, message.partition): message.offset + 1})

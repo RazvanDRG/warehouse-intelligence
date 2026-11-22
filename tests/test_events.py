@@ -10,7 +10,8 @@ import pytest
 from adapters.warehouse.events import EnvelopeError, parse_message
 from adapters.warehouse.kafka_config import WAREHOUSE_TOPICS, KafkaSettings
 from adapters.warehouse.kafka_source import KafkaEventSource
-from core.events import Event, EventSource
+from core.events import Event, EventSource, Position
+from core.idempotency import idempotent
 
 ROOT = Path(__file__).resolve().parent.parent
 EVENT_ID = "0b6f9c1e-4a52-4c8e-9a51-2f6d1c3e7a10"
@@ -179,6 +180,97 @@ def test_no_commit_when_handler_fails():
         asyncio.run(KafkaEventSource(consumer).consume(handler))
     assert consumer.commits == []
     assert consumer.calls == ["start", "stop"]
+
+
+def test_event_carries_its_position():
+    consumer = FakeConsumer([FakeMessage(encode(envelope()), topic="wms.order.audit", partition=3, offset=11)])
+    seen = []
+
+    async def handler(event):
+        seen.append(event.position)
+
+    asyncio.run(KafkaEventSource(consumer).consume(handler))
+    assert seen == [Position(topic="wms.order.audit", partition=3, offset=11)]
+
+
+# T-003 AC-5: the offset is committed only after the database transaction commits
+
+
+class FakeResult:
+    def __init__(self, row):
+        self.row = row
+
+    def first(self):
+        return self.row
+
+
+class FakeTransaction:
+    """Stands in for engine.begin(): logs the commit or rollback when the block ends."""
+
+    def __init__(self, log, fail_commit):
+        self.log = log
+        self.fail_commit = fail_commit
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if exc_type is not None:
+            self.log.append("rollback")
+            return False
+        if self.fail_commit:
+            self.log.append("commit failed")
+            raise RuntimeError("commit failed")
+        self.log.append("transaction commit")
+        return False
+
+    async def execute(self, statement):
+        # The insert of a new event returns its row.
+        return FakeResult(("inserted",))
+
+
+class FakeEngine:
+    def __init__(self, log, fail_commit=False):
+        self.log = log
+        self.fail_commit = fail_commit
+
+    def begin(self):
+        return FakeTransaction(self.log, self.fail_commit)
+
+
+class LoggingConsumer(FakeConsumer):
+    def __init__(self, messages, log):
+        super().__init__(messages)
+        self.log = log
+
+    async def commit(self, offsets):
+        self.log.append("offset commit")
+        await super().commit(offsets)
+
+
+def test_offset_committed_only_after_transaction():
+    log = []
+    consumer = LoggingConsumer([FakeMessage(encode(envelope()), offset=4)], log)
+
+    async def handler(event, conn):
+        log.append("handler")
+
+    asyncio.run(KafkaEventSource(consumer).consume(idempotent(FakeEngine(log), handler)))
+    assert log == ["handler", "transaction commit", "offset commit"]
+    assert consumer.commits == [{("wms.pick.completed", 0): 5}]
+
+
+def test_no_offset_commit_when_transaction_fails():
+    log = []
+    consumer = LoggingConsumer([FakeMessage(encode(envelope()))], log)
+
+    async def handler(event, conn):
+        log.append("handler")
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        asyncio.run(KafkaEventSource(consumer).consume(idempotent(FakeEngine(log, fail_commit=True), handler)))
+    assert log == ["handler", "commit failed"]
+    assert consumer.commits == []
 
 
 # AC-4: consumer settings from KAFKA_* environment variables

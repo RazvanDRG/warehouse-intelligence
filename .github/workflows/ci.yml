@@ -10,6 +10,21 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      # Throwaway database that lives only for this run (D-017).
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: wi
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: wi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wi -d wi_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -20,6 +35,8 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://wi:ci-only-password@localhost:5432/wi_test
       - run: python tools/boundary_check.py
 
   docker:
