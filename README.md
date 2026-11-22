@@ -5,7 +5,7 @@ An AI layer that attaches to the Warehouse Operations Service (System 1) and mak
 The flow it is built for:
 System 1 events → Kafka → index and projections → question or incident → answer with citations or a proposed action → human approval
 
-**Status:** week 2 of 10. The repo skeleton is done (API with health checks, the local stack, tests and CI), and the Kafka event reader is built but not yet run against a live broker. The AI modules come next (see Future Improvements).
+**Status:** week 2 of 10. The repo skeleton is done (API with health checks, the local stack, tests and CI), and the Kafka event reader is built, with a duplicate check that handles each event once, but not yet run against a live broker. The AI modules come next (see Future Improvements).
 
 ## 🌐 Live Demo
 
@@ -28,9 +28,9 @@ System 1 events → Kafka → index and projections → question or incident →
 **Backend**
 - Python 3.11, FastAPI, SQLAlchemy 2 (async) with asyncpg, Redis, pydantic-settings
 - aiokafka (Kafka consumer for System 1 events)
-- PostgreSQL 16 with pgvector (vector search inside Postgres)
+- PostgreSQL 16 with pgvector (vector search inside Postgres), schema managed with Alembic (versioned migrations)
 - Docker (multi-stage image, non-root user) and Docker Compose
-- Pytest (44 tests), Ruff (lint and format)
+- Pytest (63 tests), Ruff (lint and format)
 - GitHub Actions (CI)
 
 **Observability**
@@ -48,6 +48,10 @@ System 1 events → Kafka → index and projections → question or incident →
 - Local stack on 127.0.0.1 only, so nothing is reachable from the network
 - Database settings passed as separate parts, so any password works
 - Event reader: `EventSource` interface in `core/events.py`, with a Kafka implementation in `adapters/warehouse/`. It reads the 4 System 1 topics in its own consumer group (`KAFKA_GROUP_ID`, required, no default), checks every message against the event envelope (a time without a timezone counts as UTC), and marks a message done only after it has been handled. Connects to a local broker or to Aiven (SASL_SSL, settings from `KAFKA_*` environment variables)
+- Each event handled once: `core/idempotency.py` records every event_id in the `processed_events` table, in the same transaction as the handler's writes, and skips an event it has already seen. The Kafka offset is committed only after that transaction commits
+
+### Replays are safe
+Kafka delivers at least once, so the same event can arrive again: a commit lost during a rebalance, or a new `KAFKA_GROUP_ID`, which starts from the earliest kept message and delivers every one of them again. `processed_events` makes both harmless: a repeated event_id is skipped, nothing is written twice, and its offset is still committed so the reader moves on. Changing `KAFKA_GROUP_ID` is therefore safe, only slower while the old messages are skipped.
 
 ### Planned modules
 - **A. Warehouse Map:** live digital twins of zones, racks and orders
@@ -70,6 +74,9 @@ System 1 events → Kafka → index and projections → question or incident →
 - The core reads events through a generic `EventSource`; Kafka lives only in the adapter (D-009)
 - A Kafka message is marked done only after it has been handled, and an unreadable one stops the reader until the dead-letter table exists, so nothing is lost silently (D-010)
 - Every deployment and local run sets its own `KAFKA_GROUP_ID`, so a local run never takes messages from the deployed reader (D-012)
+- Schema changes go through Alembic migrations with a working downgrade, on WI's own database only (D-013)
+- The duplicate check wraps the handler, so its writes and the processed_events row are saved together or not at all, and the event reader holds no database code (D-014, D-015)
+- Database tests use a separate local `wi_test` database and refuse any other address; CI runs them on a throwaway Postgres (D-016, D-017)
 - System 1 is touched only through read channels (Kafka events, the schema, read endpoints) and one controlled write channel, used by the agent only after a human approves
 
 Every decision, with the alternative not chosen: `docs/decisions.md`.
@@ -126,6 +133,7 @@ System 1 stays the owner of its data. WI reads it through events, a schema snaps
 ```sh
 cp .env.example .env          # then set POSTGRES_PASSWORD and GRAFANA_ADMIN_PASSWORD to any local values
 docker compose --env-file .env -f infra/docker-compose.yml up -d
+.venv/Scripts/python -m alembic upgrade head   # creates WI's tables in the local wi database
 curl localhost:8001/ops/ready # 200 when Postgres and Redis answer
 docker compose --env-file .env -f infra/docker-compose.yml down
 ```
@@ -138,11 +146,19 @@ python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]"   # bin/
 .venv/Scripts/python -m ruff check . && .venv/Scripts/python -m pytest -q && .venv/Scripts/python tools/boundary_check.py
 ```
 
+The database tests need a separate test database. Without one they are skipped locally (CI always runs them):
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml up -d postgres
+docker compose --env-file .env -f infra/docker-compose.yml exec postgres createdb -U wi wi_test
+# then in .env: TEST_DATABASE_URL=postgresql+asyncpg://wi:<password>@localhost:5433/wi_test
+```
+The tests refuse any database that is not local or whose name does not end in `_test`, because they drop and recreate tables.
+
 ---
 
 ## ⚙️ CI
 
-GitHub Actions on every push and pull request: `ruff check`, `ruff format --check`, `pytest`, the boundary check, and a `docker build` of the image. No secrets and no LLM keys in CI.
+GitHub Actions on every push and pull request: `ruff check`, `ruff format --check`, `pytest` (with a throwaway Postgres service for the database tests), the boundary check, and a `docker build` of the image. No secrets and no LLM keys in CI.
 
 ---
 
@@ -157,9 +173,11 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 ## 🧪 Testing Strategy
 
-- 44 tests, run in CI on every push
+- 63 tests, run in CI on every push
 - The readiness checks are tested with faked dependencies: no real Postgres or Redis needed
 - The Kafka reader is tested with a fake consumer: valid and broken messages, commit only after the handler, no commit when the handler or parsing fails; no real Kafka needed
+- The migration is tested up, down and up again, and the duplicate check runs on a real Postgres: first delivery, a repeated event skipped, a failing handler saving nothing, a replay through a new consumer group handling each event once
+- The offset is committed only after the database transaction, checked with a fake engine that logs the order
 - A test makes sure `core/` never imports `adapters/`
 - Tests read `docker-compose.yml` and check every port binds to 127.0.0.1 and avoids System 1's ports
 - The database URL is tested with passwords that contain `@`, `:` and `/`
@@ -179,9 +197,10 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 - No AI features yet: this is the week 1 skeleton
 - `/ops/live` and `/ops/ready` are public, with no auth, like System 1's health ping
-- No database tables or migrations yet; `/metrics` is not built, so Prometheus scrapes only itself
+- The only table is `processed_events`; migrations run by hand (`alembic upgrade head`), not at startup. `/metrics` is not built, so Prometheus scrapes only itself
 - Library versions and image tags are not pinned yet
-- The Kafka reader has not run against a live broker yet (planned with the week 2 integration test); events are read but not stored, and an unreadable message stops the reader until the dead-letter table exists
+- The Kafka reader has not run against a live broker yet (planned with the week 2 integration test); there is no running consumer process and no handler that stores events yet (projections come later in week 2), and an unreadable message stops the reader until the dead-letter table exists
+- `processed_events` grows by one row per event and is never cleaned up yet
 
 ---
 

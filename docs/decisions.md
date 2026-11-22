@@ -84,3 +84,38 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: a default such as warehouse-intelligence - easy to reuse by accident.
 - Affects: adapters/warehouse/kafka_config.py, .env.example
 - Context: T-002 review loop 1
+
+## 2026-11-22 D-013: Alembic for WI's database migrations
+- Decision: every WI schema change is an Alembic migration with a working downgrade, run against WI's own Postgres only.
+- Why: the project rules require versioned schema changes; Alembic is the standard tool next to SQLAlchemy.
+- Not chosen: tables created by code at startup - no history, no downgrade.
+- Affects: alembic.ini, alembic/, pyproject.toml
+- Context: T-003
+
+## 2026-11-22 D-014: Event carries an optional typed position
+- Decision: Event gets an optional `position` (topic, partition, offset), set by the event source.
+- Why: processed_events stores where each event came from; a typed field is checked, a metadata key is not.
+- Not chosen: keys inside Event.metadata - untyped and easy to misspell.
+- Affects: core/events.py, adapters/warehouse/kafka_source.py
+- Context: T-003
+
+## 2026-11-22 D-015: Duplicate check as a generic wrapper around the handler
+- Decision: core/idempotency.py wraps a handler that receives (event, connection); one transaction holds the processed_events insert and the handler's writes.
+- Why: both are saved or neither, and the event source stays free of database code.
+- Not chosen: the transaction inside KafkaEventSource - ties the reader to the database.
+- Affects: core/idempotency.py, every future event handler
+- Context: T-003
+
+## 2026-11-22 D-016: Database tests use TEST_DATABASE_URL, skipped locally when unset
+- Decision: database tests run on a separate wi_test database; unset locally they skip with a visible reason, in CI they must run.
+- Why: the local check works without Docker, while CI still proves the database behavior.
+- Not chosen: always required - every local run would need Docker up.
+- Affects: tests/, .env.example
+- Context: T-003
+
+## 2026-11-22 D-017: CI runs a Postgres service
+- Decision: GitHub Actions starts pgvector/pgvector:pg16 with a throwaway password for the test step.
+- Why: the database tests must run on every push; the service is free and lives only during the run.
+- Not chosen: no database in CI - the migration and duplicate tests would never run there.
+- Affects: .github/workflows/ci.yml
+- Context: T-003
