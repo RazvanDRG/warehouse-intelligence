@@ -4,13 +4,14 @@ import asyncio
 
 import pytest
 from alembic import command
-from core.deadletter import DeadLetterSink, PostgresDeadLetterSink
 from sqlalchemy import select, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from adapters.warehouse.kafka_source import KafkaEventSource
 from core.db.tables import dead_letters, processed_events
+from core.deadletter import DeadLetterSink, PostgresDeadLetterSink
 from core.events import Position
 from core.idempotency import idempotent
 from tests.dbsupport import alembic_config, database_url_or_skip
@@ -174,13 +175,51 @@ def test_handler_failing_every_try_is_dead_lettered():
 # AC-6: a database outage, or a failed dead_letters write, stops the consumer
 
 
+class DriverError(Exception):
+    """Stands in for a driver error that carries a Postgres SQLSTATE code."""
+
+    def __init__(self, sqlstate):
+        super().__init__(f"server said {sqlstate}")
+        self.sqlstate = sqlstate
+
+
+class WrappedDriverError(Exception):
+    """A driver error whose code sits only on the native error it wraps."""
+
+    def __init__(self, sqlstate):
+        super().__init__("wrapped")
+        self.__cause__ = DriverError(sqlstate)
+
+
+def driver_error(orig, invalidated=False):
+    # A plain DBAPIError, the way some drivers report every server error.
+    return DBAPIError("SELECT 1", {}, orig, connection_invalidated=invalidated)
+
+
 @pytest.mark.parametrize(
     "outage",
     [
         OperationalError("SELECT 1", {}, ConnectionRefusedError("refused")),
         ConnectionRefusedError("refused"),
+        PoolTimeoutError("no free connection in the pool"),
+        driver_error(DriverError("57P01")),
+        driver_error(DriverError("57P03")),
+        driver_error(DriverError("53300")),
+        driver_error(DriverError("08006")),
+        driver_error(WrappedDriverError("57P01")),
+        driver_error(Exception("connection lost"), invalidated=True),
     ],
-    ids=["sqlalchemy-operational", "connection-refused"],
+    ids=[
+        "sqlalchemy-operational",
+        "connection-refused",
+        "pool-timeout",
+        "admin-shutdown",
+        "cannot-connect-now",
+        "too-many-connections",
+        "connection-failure",
+        "code-on-wrapped-error",
+        "connection-invalidated",
+    ],
 )
 def test_database_outage_stops_without_dead_letter(outage):
     consumer = FakeConsumer([FakeMessage(encode(envelope())), FakeMessage(encode(envelope(event_id=OTHER_ID)))])
@@ -197,6 +236,22 @@ def test_database_outage_stops_without_dead_letter(outage):
     assert sink.records == []
     assert consumer.commits == []
     assert consumer.calls == ["start", "stop"]
+
+
+def test_database_error_caused_by_the_event_is_dead_lettered():
+    # 23505 unique violation: the database is fine, the event is not, so it is not an outage.
+    consumer = FakeConsumer([FakeMessage(encode(envelope()))])
+    sink, sleep = FakeSink(), FakeSleep()
+
+    async def handler(event):
+        raise driver_error(DriverError("23505"))
+
+    run(consumer, handler, sink, sleep)
+
+    assert sleep.waits == [0.5, 1.0]
+    assert len(sink.records) == 1
+    assert "DBAPIError" in sink.records[0][2]
+    assert consumer.commits == [{(TOPIC, 0): 1}]
 
 
 def test_failed_dead_letter_write_stops_without_commit():
@@ -286,6 +341,34 @@ def test_postgres_sink_keeps_one_row_per_position(db_url):
 
     rows = run_with_engine(db_url, body)
     assert [r[:5] for r in rows] == [("test.topic", 0, 1, b"first", "first error")]
+
+
+def test_handler_retried_after_one_failure_saves_the_event_once(db_url):
+    # AC-4 on the real tables: the failed try saves nothing, the retry saves the write and its record once.
+    tries = []
+
+    async def flaky(event, conn):
+        tries.append(event.event_id)
+        await conn.execute(text("INSERT INTO test_writes (event_id) VALUES (:id)"), {"id": event.event_id})
+        if len(tries) == 1:
+            raise RuntimeError("first try broke")
+
+    consumer = FakeConsumer([FakeMessage(encode(envelope()), offset=6)])
+
+    async def body(engine):
+        source = KafkaEventSource(consumer, dead_letters=PostgresDeadLetterSink(engine), sleep=FakeSleep())
+        await source.consume(idempotent(engine, flaky))
+        async with engine.connect() as conn:
+            writes = (await conn.execute(text("SELECT event_id FROM test_writes"))).scalars().all()
+            processed = (await conn.execute(select(processed_events.c.event_id))).scalars().all()
+        return list(writes), list(processed), await dead_letter_rows(engine)
+
+    writes, processed, rows = run_with_engine(db_url, body)
+    assert tries == [EVENT_ID, EVENT_ID]
+    assert writes == [EVENT_ID]
+    assert processed == [EVENT_ID]
+    assert rows == []
+    assert consumer.commits == [{(TOPIC, 0): 7}]
 
 
 def test_failing_handler_end_to_end(db_url):

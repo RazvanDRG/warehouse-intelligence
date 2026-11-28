@@ -32,7 +32,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - aiokafka (Kafka consumer for System 1 events)
 - PostgreSQL 16 with pgvector (vector search inside Postgres), schema managed with Alembic (versioned migrations)
 - Docker (multi-stage image, non-root user) and Docker Compose
-- Pytest (78 tests), Ruff (lint and format)
+- Pytest (87 tests), Ruff (lint and format)
 - GitHub Actions (CI)
 
 **Observability**
@@ -177,7 +177,7 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 ## 🧪 Testing Strategy
 
-- 78 tests, run in CI on every push
+- 87 tests, run in CI on every push
 - The readiness checks are tested with faked dependencies: no real Postgres or Redis needed
 - The Kafka reader is tested with a fake consumer: valid and broken messages, commit only after the handler, no commit when the handler or parsing fails; no real Kafka needed
 - The migration is tested up, down and up again, and the duplicate check runs on a real Postgres: first delivery, a repeated event skipped, a failing handler saving nothing, a replay through a new consumer group handling each event once
@@ -206,7 +206,8 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 - Library versions and image tags are not pinned yet
 - The Kafka reader has not run against a live broker yet (planned with the week 2 integration test); there is no running consumer process and no handler that stores events yet (projections come later in week 2)
 - Dead letters can only be read in the table: nothing replays them yet, and there is no alert or metric for them yet (planned for week 2 Sat)
-- A database outage is recognised by its error type (connection, interface or network errors); any other error counts as a bad event and goes to dead letters after 3 tries
+- A database outage is recognised by its error: connection, network and pool-timeout errors, a dropped connection, or a Postgres error code of class 08 (connection), 53 (too many connections, no resources) or 57 (shutdown, still starting). Any other error counts as a bad event and goes to dead letters after 3 tries
+- The reader dead-letters only when it is given the dead-letter store; nothing runs the reader with it yet (no consumer process until the week 2 projections)
 - `processed_events` grows by one row per event and is never cleaned up yet
 
 ---

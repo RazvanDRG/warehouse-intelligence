@@ -12,7 +12,8 @@ from collections.abc import Awaitable, Callable
 from typing import Protocol, runtime_checkable
 
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from core.db.tables import dead_letters
@@ -21,8 +22,15 @@ from core.events import Event, EventHandler, Position
 # Waits between tries of a failing handler: 3 tries in all (D-019).
 RETRY_DELAYS: tuple[float, ...] = (0.5, 1.0)
 
-# Errors that mean the database cannot be reached; OSError covers a refused or timed-out connection.
-OUTAGE_ERRORS: tuple[type[BaseException], ...] = (OperationalError, InterfaceError, OSError)
+# Errors that mean the database cannot be reached: OSError covers a refused or timed-out connection,
+# PoolTimeoutError a pool with no free connection.
+OUTAGE_ERRORS: tuple[type[BaseException], ...] = (OperationalError, InterfaceError, PoolTimeoutError, OSError)
+
+# Postgres error classes (the first two characters of SQLSTATE) that mean the server is unreachable or
+# unwell, not that the event is bad: 08 connection exception, 53 insufficient resources (for example
+# too many connections), 57 operator intervention (for example a shutdown or a server still starting).
+# Some drivers report these as a plain DBAPIError, so the class is checked as well as the type.
+OUTAGE_SQLSTATE_CLASSES: tuple[str, ...] = ("08", "53", "57")
 
 Sleep = Callable[[float], Awaitable[None]]
 
@@ -57,8 +65,21 @@ class PostgresDeadLetterSink:
             await conn.execute(statement)
 
 
+def _sqlstate(error: DBAPIError) -> str:
+    # The driver's error, or the native error it wraps, carries the code.
+    for source in (error.orig, getattr(error.orig, "__cause__", None)):
+        code = getattr(source, "sqlstate", None) or getattr(source, "pgcode", None)
+        if isinstance(code, str):
+            return code
+    return ""
+
+
 def is_outage(error: BaseException) -> bool:
-    return isinstance(error, OUTAGE_ERRORS)
+    if isinstance(error, OUTAGE_ERRORS):
+        return True
+    if isinstance(error, DBAPIError):
+        return error.connection_invalidated or _sqlstate(error)[:2] in OUTAGE_SQLSTATE_CLASSES
+    return False
 
 
 async def run_with_retries(handler: EventHandler, event: Event, sleep: Sleep) -> Exception | None:
