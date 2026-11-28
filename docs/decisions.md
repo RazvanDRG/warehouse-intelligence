@@ -147,3 +147,10 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: consume(handler, dead_letter) on every source (changes a core contract).
 - Affects: core/deadletter.py, adapters/warehouse/kafka_source.py
 - Context: T-004
+
+## 2026-11-28 D-022: Each Kafka position is dead-lettered once
+- Decision: dead_letters has a unique rule on (topic, partition, offset); a message delivered again keeps the existing row.
+- Why: delivery is at-least-once, so the same broken message can arrive twice; duplicate rows would inflate the incident inbox.
+- Not chosen: no unique rule (a repeated message gets a second row).
+- Affects: alembic/versions/0002_dead_letters.py, core/db/tables.py, core/deadletter.py
+- Context: T-004
