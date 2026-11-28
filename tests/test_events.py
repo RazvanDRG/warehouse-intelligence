@@ -124,6 +124,12 @@ def test_parse_broken_json():
         parse_message(b'{"event_id": ')
 
 
+def test_parse_tombstone_is_an_envelope_error():
+    # T-004 AC-3: a message with no value (a Kafka tombstone) is an EnvelopeError, not a TypeError.
+    with pytest.raises(EnvelopeError, match="no value"):
+        parse_message(None)
+
+
 def test_parse_time_without_zone_is_utc():
     # System 1 sets occurred_at with datetime.utcnow, so a time without a zone means UTC.
     event = parse_message(encode(envelope(occurred_at="2026-11-21T10:15:00")))

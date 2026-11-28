@@ -119,3 +119,38 @@ Why the project is built the way it is. One entry per decision, newest last. A c
 - Not chosen: no database in CI - the migration and duplicate tests would never run there.
 - Affects: .github/workflows/ci.yml
 - Context: T-003
+
+## 2026-11-28 D-018: dead_letters keeps the Kafka position and the raw bytes
+- Decision: dead_letters has id, topic, partition, offset, payload (raw bytes, NULL for a tombstone), error, created_at.
+- Why: partition and offset point to the exact Kafka message, like processed_events; raw bytes keep even non-UTF-8 messages.
+- Not chosen: the architecture's 5 columns only (cannot find the message again); stage and attempts columns (not needed yet).
+- Affects: core/db/tables.py, alembic/versions
+- Context: T-004
+
+## 2026-11-28 D-019: A failing handler gets 3 tries, then dead-letter
+- Decision: 3 tries with waits of 0.5s then 1s; after the last failure the message goes to dead_letters, the offset is committed and the consumer continues.
+- Why: one bad event must not block every event behind it.
+- Not chosen: stop after 3 tries (one event blocks all); try count and wait as settings (no need yet).
+- Affects: adapters/warehouse/kafka_source.py, core/deadletter.py
+- Context: T-004
+
+## 2026-11-28 D-020: A database outage stops the consumer, never dead-letters
+- Decision: a database connection error, or a failed dead_letters write, stops the consumer without committing.
+- Why: during an outage every event would fail; stopping keeps them in Kafka to be handled when the database is back.
+- Not chosen: treat it like any other error (an outage would dead-letter every event that arrived meanwhile).
+- Affects: adapters/warehouse/kafka_source.py, core/deadletter.py
+- Context: T-004
+
+## 2026-11-28 D-021: Dead-letter sink is passed to the event source
+- Decision: a generic DeadLetterSink in core/deadletter.py, given to KafkaEventSource when it is built; EventSource.consume(handler) stays the same.
+- Why: keeps the core contract unchanged for every future source.
+- Not chosen: consume(handler, dead_letter) on every source (changes a core contract).
+- Affects: core/deadletter.py, adapters/warehouse/kafka_source.py
+- Context: T-004
+
+## 2026-11-28 D-022: Each Kafka position is dead-lettered once
+- Decision: dead_letters has a unique rule on (topic, partition, offset); a message delivered again keeps the existing row.
+- Why: delivery is at-least-once, so the same broken message can arrive twice; duplicate rows would inflate the incident inbox.
+- Not chosen: no unique rule (a repeated message gets a second row).
+- Affects: alembic/versions/0002_dead_letters.py, core/db/tables.py, core/deadletter.py
+- Context: T-004

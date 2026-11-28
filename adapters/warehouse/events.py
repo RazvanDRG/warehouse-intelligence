@@ -34,7 +34,10 @@ class WarehouseEnvelope(BaseModel):
         return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
 
-def parse_message(value: bytes) -> Event:
+def parse_message(value: bytes | None) -> Event:
+    if value is None:
+        # A Kafka tombstone carries a key but no value.
+        raise EnvelopeError("message has no value (a tombstone)")
     try:
         raw = json.loads(value)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
