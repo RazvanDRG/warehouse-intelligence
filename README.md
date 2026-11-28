@@ -19,6 +19,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - The whole local stack starts with one command: API, Postgres with pgvector, Redis, Prometheus, Grafana
 - Runs side by side with System 1 on the same machine (different ports)
 - Reads System 1's Kafka events and handles each one only once, even when Kafka delivers it again or a new consumer group replays everything
+- A bad message never blocks the rest: unreadable messages and events whose handler keeps failing are kept in a dead-letter table with their error, and the reader moves on
 - Every push is checked by CI: lint, format, tests (database tests on a real Postgres), the one-door boundary check and a Docker build
 - One door to System 1: only one adapter file may call it, checked in CI
 
@@ -31,7 +32,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - aiokafka (Kafka consumer for System 1 events)
 - PostgreSQL 16 with pgvector (vector search inside Postgres), schema managed with Alembic (versioned migrations)
 - Docker (multi-stage image, non-root user) and Docker Compose
-- Pytest (63 tests), Ruff (lint and format)
+- Pytest (78 tests), Ruff (lint and format)
 - GitHub Actions (CI)
 
 **Observability**
@@ -50,6 +51,7 @@ System 1 events → Kafka → index and projections → question or incident →
 - Database settings passed as separate parts, so any password works
 - Event reader: `EventSource` interface in `core/events.py`, with a Kafka implementation in `adapters/warehouse/`. It reads the 4 System 1 topics in its own consumer group (`KAFKA_GROUP_ID`, required, no default), checks every message against the event envelope (a time without a timezone counts as UTC), and marks a message done only after it has been handled. Connects to a local broker or to Aiven (SASL_SSL, settings from `KAFKA_*` environment variables)
 - Each event handled once: `core/idempotency.py` records every event_id in the `processed_events` table, in the same transaction as the handler's writes, and skips an event it has already seen. The Kafka offset is committed only after that transaction commits
+- Dead letters: `core/deadletter.py` keeps a message that cannot be read (broken JSON, a wrong or missing field, an empty tombstone) in the `dead_letters` table with its topic, partition, offset, raw bytes and error. A handler that fails is tried 3 times (waits of 0.5 s and 1 s), then its message goes there too. The offset is committed only after the dead letter is saved, and each Kafka position is kept once. When WI's database cannot be reached, the reader stops instead, so an outage does not turn every event into a dead letter
 
 ### Replays are safe
 Kafka delivers at least once, so the same event can arrive again: a commit lost during a rebalance, or a new `KAFKA_GROUP_ID`, which starts from the earliest kept message and delivers every one of them again. `processed_events` makes both harmless: a repeated event_id is skipped, nothing is written twice, and its offset is still committed so the reader moves on. Changing `KAFKA_GROUP_ID` is therefore safe, only slower while the old messages are skipped.
@@ -73,7 +75,8 @@ Kafka delivers at least once, so the same event can arrive again: a commit lost 
 - The database URL is built from separate settings, so a password with `@` or `:` cannot break it (D-005)
 - `core/` never imports `adapters/`: the AI parts stay generic, everything specific to System 1 lives in one place
 - The core reads events through a generic `EventSource`; Kafka lives only in the adapter (D-009)
-- A Kafka message is marked done only after it has been handled, and an unreadable one stops the reader until the dead-letter table exists, so nothing is lost silently (D-010)
+- A Kafka message is marked done only after it has been handled or saved as a dead letter, so nothing is lost silently (D-010)
+- Dead letters keep the exact Kafka position and raw bytes, once per position; a failing handler gets 3 tries; a database outage stops the reader instead of filling the dead-letter table; the dead-letter store is passed to the event reader, so the generic `EventSource` interface did not change (D-018 to D-022)
 - Every deployment and local run sets its own `KAFKA_GROUP_ID`, so a local run never takes messages from the deployed reader (D-012)
 - Schema changes go through Alembic migrations with a working downgrade, on WI's own database only (D-013)
 - The duplicate check wraps the handler, so its writes and the processed_events row are saved together or not at all, and the event reader holds no database code (D-014, D-015)
@@ -174,11 +177,12 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 ## 🧪 Testing Strategy
 
-- 63 tests, run in CI on every push
+- 78 tests, run in CI on every push
 - The readiness checks are tested with faked dependencies: no real Postgres or Redis needed
 - The Kafka reader is tested with a fake consumer: valid and broken messages, commit only after the handler, no commit when the handler or parsing fails; no real Kafka needed
 - The migration is tested up, down and up again, and the duplicate check runs on a real Postgres: first delivery, a repeated event skipped, a failing handler saving nothing, a replay through a new consumer group handling each event once
 - The offset is committed only after the database transaction, checked with a fake engine that logs the order
+- Dead letters: broken JSON, wrong fields and tombstones are saved and the reader moves on; a handler retried once, or dead-lettered after 3 tries; a database outage or a failed dead-letter write stops the reader with nothing committed; on a real Postgres, one row per Kafka position and a failing event dead-lettered while the next one is saved
 - A test makes sure `core/` never imports `adapters/`
 - Tests read `docker-compose.yml` and check every port binds to 127.0.0.1 and avoids System 1's ports
 - The database URL is tested with passwords that contain `@`, `:` and `/`
@@ -198,9 +202,11 @@ GitHub Actions on every push and pull request: `ruff check`, `ruff format --chec
 
 - No AI features yet: this is the week 1 skeleton
 - `/ops/live` and `/ops/ready` are public, with no auth, like System 1's health ping
-- The only table is `processed_events`; migrations run by hand (`alembic upgrade head`), not at startup. `/metrics` is not built, so Prometheus scrapes only itself
+- The only tables are `processed_events` and `dead_letters`; migrations run by hand (`alembic upgrade head`), not at startup. `/metrics` is not built, so Prometheus scrapes only itself
 - Library versions and image tags are not pinned yet
-- The Kafka reader has not run against a live broker yet (planned with the week 2 integration test); there is no running consumer process and no handler that stores events yet (projections come later in week 2), and an unreadable message stops the reader until the dead-letter table exists
+- The Kafka reader has not run against a live broker yet (planned with the week 2 integration test); there is no running consumer process and no handler that stores events yet (projections come later in week 2)
+- Dead letters can only be read in the table: nothing replays them yet, and there is no alert or metric for them yet (planned for week 2 Sat)
+- A database outage is recognised by its error type (connection, interface or network errors); any other error counts as a bad event and goes to dead letters after 3 tries
 - `processed_events` grows by one row per event and is never cleaned up yet
 
 ---

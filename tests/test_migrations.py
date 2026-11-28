@@ -21,9 +21,7 @@ async def table_info(url: str, table: str) -> dict:
                     return {}
                 pk = inspector.get_pk_constraint(table)["constrained_columns"]
                 return {
-                    "columns": {
-                        c["name"]: {**c, "primary_key": c["name"] in pk} for c in inspector.get_columns(table)
-                    },
+                    "columns": {c["name"]: {**c, "primary_key": c["name"] in pk} for c in inspector.get_columns(table)},
                     "unique": [u["column_names"] for u in inspector.get_unique_constraints(table)],
                 }
 
