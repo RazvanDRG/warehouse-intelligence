@@ -109,3 +109,23 @@ One entry per session, newest last. Written by `/handoff`.
   - T-003 follow-ups (handler must not commit its connection, debug log on skip, downgrade loses history, alembic guard for Supabase, pruning) in docs/tasks/T-003-d2.w2.md.
   - Still open: allow only squash merges in GitHub settings; Week 2 text for the Word plan; Mermaid rendering.
 - Next step: Week 2 Wed with /day then /task and /db-change: dead-letter table; a tombstone (no value) caught as EnvelopeError and sent there (T-002 follow-up in docs/tasks/T-002-d1.w2.md); files adapters/warehouse/kafka_source.py, adapters/warehouse/events.py (critical), core/db/tables.py, alembic/versions/.
+
+## 2026-11-28 T-004 dead-letter for the event consumer
+- Done: T-004 built test first through /db-change; review loop 1 FAIL (AC-4 test, outage check missed asyncpg errors), fixed; loop 2 risk PASS, evaluator FAIL only because database tests were not run in review; branch pushed, CI run 46164377423 on 1b7101d green (87 passed, none skipped); user accepted it, then chose to rerun /task-review before /pr. PR description drafted, no PR yet.
+- Changed:
+  - Backend: unreadable messages and handlers failing 3 tries go to dead_letters, offset committed after the dead letter; database outages (error type, SQLSTATE 08/53/57, pool timeout) stop without commit; tombstone is an EnvelopeError (core/deadletter.py, adapters/warehouse/kafka_source.py, adapters/warehouse/events.py)
+  - Frontend: none
+  - Database: new table dead_letters (id identity, topic, partition, offset, payload bytea null, error, created_at, unique topic+partition+offset), on local wi_test only (alembic/versions/0002_dead_letters.py, core/db/tables.py)
+  - Tests: dead letters with fakes and on Postgres, outage cases, retry saves once, tombstone, migration up/down/up; 87 in total (tests/test_deadletter.py, tests/test_events.py, tests/test_migrations.py)
+  - Config/CI: none
+  - Docs: README capabilities, features, decisions, testing, limits; D-018 to D-022; T-004 task file with review, follow-ups, your checks
+- Plan: did Week 2 Wed (Dead-letter: invalid message, broken payload, limited retry), pending review and merge; next Week 2 Thu (Projections: orders, stock, audit)
+- State: task/T-004-d3w2-dead-letter, 1 task-file commit plus this note ahead of origin; no failing tests; extensions.txt untracked, not part of the task.
+- Decisions taken by the user: D-018 dead_letters keeps position and raw bytes; D-019 3 tries then dead-letter; D-020 outage stops, never dead-letters; D-021 sink passed to the event source; D-022 each position dead-lettered once.
+- Open questions:
+  - Guard false alarms: a shell command writing decisions text was blocked as a secret read; reading .venv library code is denied. Use the Edit and Write tools for docs.
+  - PowerShell Get-Content/Set-Content garble README emojis (wrong encoding); edit with the Edit tool only.
+  - The first loop 2 risk reviewer ended without a verdict; a rerun was needed.
+  - /docs-check: architecture section 14 lacks dead_letters partition, offset and unique rule; processed_events partition and offset still open from T-003.
+  - Follow-ups for Week 2 Thu and Sat are in docs/tasks/T-004-d3.w2.md (wire the sink, narrow OSError, handler time limit, RecursionError, trim error text).
+- Next step: type /task-review on task/T-004-d3w2-dead-letter (the checker can now cite CI run 46164377423), then /pr with the drafted description (docs/tasks/T-004-d3.w2.md).
